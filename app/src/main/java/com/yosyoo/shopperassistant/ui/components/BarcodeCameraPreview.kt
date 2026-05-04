@@ -84,53 +84,63 @@ fun BarcodeCameraPreview(
         camera?.cameraControl?.enableTorch(torchEnabled)
     }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraExecutor.shutdown()
+            barcodeScanner.close()
+        }
+    }
+
     DisposableEffect(lifecycleOwner, previewView) {
         var cameraProvider: ProcessCameraProvider? = null
+        var disposed = false
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
         cameraProviderFuture.addListener(
             {
                 val provider = cameraProviderFuture.get()
-                cameraProvider = provider
+                if (!disposed) {
+                    cameraProvider = provider
 
-                val preview = Preview.Builder()
-                    .setTargetAspectRatio(AspectRatio.RATIO_16_9)
-                    .build()
-                    .also { it.surfaceProvider = previewView.surfaceProvider }
+                    val preview = Preview.Builder()
+                        .setTargetAspectRatio(AspectRatio.RATIO_16_9)
+                        .build()
+                        .also { it.surfaceProvider = previewView.surfaceProvider }
 
-                val imageAnalysis = ImageAnalysis.Builder()
-                    .setTargetAspectRatio(AspectRatio.RATIO_16_9)
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-                    .also { analysis ->
-                        analysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                            analyzeImageProxy(
-                                imageProxy = imageProxy,
-                                processingFrame = processingFrame,
-                                scanner = barcodeScanner,
-                                mainHandler = mainHandler,
-                                onBarcodeScanned = onBarcodeScanned,
-                            )
+                    val imageAnalysis = ImageAnalysis.Builder()
+                        .setTargetAspectRatio(AspectRatio.RATIO_16_9)
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+                        .also { analysis ->
+                            analysis.setAnalyzer(cameraExecutor) { imageProxy ->
+                                analyzeImageProxy(
+                                    imageProxy = imageProxy,
+                                    processingFrame = processingFrame,
+                                    scanner = barcodeScanner,
+                                    mainHandler = mainHandler,
+                                    onBarcodeScanned = onBarcodeScanned,
+                                )
+                            }
                         }
-                    }
 
-                provider.unbindAll()
-                val boundCamera = provider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    imageAnalysis,
-                )
-                camera = boundCamera
-                onTorchAvailabilityChanged(boundCamera.cameraInfo.hasFlashUnit())
+                    provider.unbindAll()
+                    val boundCamera = provider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        imageAnalysis,
+                    )
+                    camera = boundCamera
+                    onTorchAvailabilityChanged(boundCamera.cameraInfo.hasFlashUnit())
+                }
             },
             mainExecutor,
         )
 
         onDispose {
+            disposed = true
             cameraProvider?.unbindAll()
-            cameraExecutor.shutdown()
-            barcodeScanner.close()
+            camera = null
         }
     }
 

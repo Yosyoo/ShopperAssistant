@@ -6,11 +6,32 @@ import java.time.Instant
 import org.json.JSONArray
 import org.json.JSONObject
 
-class BarcodeHistoryStore(context: Context) {
+internal interface BarcodeHistoryRepository {
+    fun load(): List<BarcodeHistoryItem>
+    fun save(items: List<BarcodeHistoryItem>)
+}
+
+internal class BarcodeHistoryStore(context: Context) : BarcodeHistoryRepository {
     private val preferences = context.getSharedPreferences("barcode_history", Context.MODE_PRIVATE)
 
-    fun load(): List<BarcodeHistoryItem> {
-        val rawJson = preferences.getString(KeyItems, null) ?: return emptyList()
+    override fun load(): List<BarcodeHistoryItem> {
+        return BarcodeHistoryJson.decode(preferences.getString(KeyItems, null))
+    }
+
+    override fun save(items: List<BarcodeHistoryItem>) {
+        preferences.edit()
+            .putString(KeyItems, BarcodeHistoryJson.encode(items))
+            .apply()
+    }
+
+    private companion object {
+        const val KeyItems = "items"
+    }
+}
+
+internal object BarcodeHistoryJson {
+    fun decode(rawJson: String?): List<BarcodeHistoryItem> {
+        if (rawJson == null) return emptyList()
         return runCatching {
             val items = JSONArray(rawJson)
             buildList {
@@ -32,7 +53,7 @@ class BarcodeHistoryStore(context: Context) {
         }.getOrDefault(emptyList())
     }
 
-    fun save(items: List<BarcodeHistoryItem>) {
+    fun encode(items: List<BarcodeHistoryItem>): String {
         val json = JSONArray()
         items.forEach { item ->
             json.put(
@@ -43,12 +64,6 @@ class BarcodeHistoryStore(context: Context) {
                     .put("savedAt", item.savedAt.toEpochMilli()),
             )
         }
-        preferences.edit()
-            .putString(KeyItems, json.toString())
-            .apply()
-    }
-
-    private companion object {
-        const val KeyItems = "items"
+        return json.toString()
     }
 }

@@ -3,6 +3,7 @@ package com.yosyoo.shopperassistant.ui
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.lifecycle.AndroidViewModel
+import com.yosyoo.shopperassistant.barcode.BarcodeHistoryRepository
 import com.yosyoo.shopperassistant.barcode.BarcodeHistoryStore
 import com.yosyoo.shopperassistant.barcode.Code39Generator
 import com.yosyoo.shopperassistant.barcode.InvalidCode39ContentException
@@ -39,12 +40,54 @@ data class ShopperUiState(
     val expiryError: String? = null,
 )
 
-class ShopperViewModel(application: Application) : AndroidViewModel(application) {
-    private val historyStore = BarcodeHistoryStore(application)
+internal data class GeneratedCode39(
+    val normalizedText: String,
+    val bitmap: Bitmap?,
+)
+
+internal fun interface Code39BarcodeGenerator {
+    fun generate(value: String): GeneratedCode39
+}
+
+private object ProductionCode39BarcodeGenerator : Code39BarcodeGenerator {
+    override fun generate(value: String): GeneratedCode39 {
+        val normalizedText = Code39Generator.normalizeOrThrow(value)
+        return GeneratedCode39(
+            normalizedText = normalizedText,
+            bitmap = Code39Generator.generate(normalizedText),
+        )
+    }
+}
+
+class ShopperViewModel internal constructor(
+    application: Application,
+    private val historyStore: BarcodeHistoryRepository,
+    private val code39Generator: Code39BarcodeGenerator,
+    private val todayProvider: () -> LocalDate,
+    private val idProvider: () -> String,
+    private val nowProvider: () -> Instant,
+) : AndroidViewModel(application) {
+    constructor(application: Application) : this(
+        application = application,
+        historyStore = BarcodeHistoryStore(application),
+        code39Generator = ProductionCode39BarcodeGenerator,
+        todayProvider = { LocalDate.now() },
+        idProvider = { UUID.randomUUID().toString() },
+        nowProvider = { Instant.now() },
+    )
+
     private val _uiState = MutableStateFlow(
-        ShopperUiState(
-            barcodeHistory = historyStore.load(),
-        ),
+        todayProvider().let { today ->
+            ShopperUiState(
+                productionDate = today,
+                expiryResult = ExpiryCalculator.check(
+                    productionDate = today,
+                    shelfLifeDays = 30,
+                    today = today,
+                ),
+                barcodeHistory = historyStore.load(),
+            )
+        },
     )
     val uiState: StateFlow<ShopperUiState> = _uiState.asStateFlow()
 
@@ -66,6 +109,7 @@ class ShopperViewModel(application: Application) : AndroidViewModel(application)
     fun onBarcodeScanned(rawValue: String) {
         val cleanValue = rawValue.trim()
         if (cleanValue.isEmpty()) return
+        if (cleanValue == _uiState.value.manualBarcodeInput.trim()) return
         _uiState.update {
             it.copy(
                 manualBarcodeInput = cleanValue,
@@ -84,10 +128,10 @@ class ShopperViewModel(application: Application) : AndroidViewModel(application)
         val current = _uiState.value
         val normalizedText = current.normalizedCode39Text ?: return false
         val historyItem = BarcodeHistoryItem(
-            id = UUID.randomUUID().toString(),
+            id = idProvider(),
             text = normalizedText,
             format = "条形码",
-            savedAt = Instant.now(),
+            savedAt = nowProvider(),
         )
         val nextHistory = listOf(historyItem)
             .plus(current.barcodeHistory.filterNot { it.text == normalizedText })
@@ -133,14 +177,13 @@ class ShopperViewModel(application: Application) : AndroidViewModel(application)
 
     private fun generateCode39(value: String) {
         try {
-            val normalizedText = Code39Generator.normalizeOrThrow(value)
-            val bitmap = Code39Generator.generate(normalizedText)
+            val generated = code39Generator.generate(value)
             _uiState.update { current ->
                 current.copy(
                     manualBarcodeInput = value,
-                    code39Bitmap = bitmap,
+                    code39Bitmap = generated.bitmap,
                     code39Error = null,
-                    normalizedCode39Text = normalizedText,
+                    normalizedCode39Text = generated.normalizedText,
                 )
             }
         } catch (exception: InvalidCode39ContentException) {
@@ -166,7 +209,7 @@ class ShopperViewModel(application: Application) : AndroidViewModel(application)
                 expiryResult = ExpiryCalculator.check(
                     productionDate = productionDate,
                     shelfLifeDays = shelfLifeDays,
-                    today = LocalDate.now(),
+                    today = todayProvider(),
                 ),
                 expiryError = null,
             )

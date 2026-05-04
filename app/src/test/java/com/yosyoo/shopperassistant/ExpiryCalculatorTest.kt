@@ -80,4 +80,28 @@ class ExpiryCalculatorTest {
             )
         }
     }
+
+    @Test
+    fun check_rejectsNegativeShelfLifeDays() {
+        expectThrows<IllegalArgumentException> {
+            ExpiryCalculator.check(
+                productionDate = today,
+                shelfLifeDays = -1,
+                today = today,
+            )
+        }
+    }
+
+    @Test
+    fun check_treatsShelfLifeOfOneAsExpiringOnProductionDate() {
+        val result = ExpiryCalculator.check(
+            productionDate = today,
+            shelfLifeDays = 1,
+            today = today,
+        )
+
+        expectEquals(today, result.expiryDate)
+        expectTrue(result.isExpired)
+        expectEquals(0L, result.daysUntilExpiry)
+    }
 }
