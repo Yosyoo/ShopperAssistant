@@ -1,15 +1,32 @@
+# Gradle / Android build output
+.gradle/
+.kotlin/
+/build/
+**/build/
+.externalNativeBuild/
+.cxx/
+captures/
+
+# Local machine config
+local.properties
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
+.DS_Store
+
+# Android Studio user state
+/.idea/caches/
+/.idea/libraries/
 /.idea/modules.xml
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
+/.idea/deploymentTargetSelector.xml
+
+# App packages and signing material
+*.apk
+*.aab
+*.apks
+*.idsig
+*.jks
+*.keystore
+keystore.properties
+signing.properties
