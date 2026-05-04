@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -38,7 +39,6 @@ import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -50,6 +50,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -62,6 +63,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -78,13 +80,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.yosyoo.shopperassistant.R
 import com.yosyoo.shopperassistant.barcode.BarcodeImageStorage
 import com.yosyoo.shopperassistant.expiry.ExpiryResult
 import com.yosyoo.shopperassistant.model.BarcodeHistoryItem
@@ -102,6 +108,7 @@ import kotlinx.coroutines.launch
 
 private val ChineseDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日")
 private val HistoryDateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("M月d日 HH:mm")
+private val CardShape = RoundedCornerShape(8.dp)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,11 +121,18 @@ fun ShopperAssistantApp(
     val context = LocalContext.current
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             CenterAlignedTopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                ),
                 title = {
                     Text(
-                        text = "超市助手",
+                        text = stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -162,7 +176,7 @@ fun ShopperAssistantApp(
                             runCatching {
                                 BarcodeImageStorage.saveToPictures(context, bitmap, barcodeText)
                             }.onSuccess {
-                                snackbarHostState.showSnackbar("已保存到图片/超市助手")
+                                snackbarHostState.showSnackbar("已保存到图片/ShopperAssistant")
                             }.onFailure { throwable ->
                                 snackbarHostState.showSnackbar(throwable.message ?: "保存失败")
                             }
@@ -217,11 +231,51 @@ fun ShopperAssistantApp(
 }
 
 @Composable
+private fun ToolScreen(
+    modifier: Modifier = Modifier,
+    content: LazyListScope.() -> Unit,
+) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun SectionHeader(
+    icon: ImageVector,
+    title: String,
+    modifier: Modifier = Modifier,
+    trailing: @Composable (() -> Unit)? = null,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        trailing?.invoke()
+    }
+}
+
+@Composable
 private fun ScanGenerateScreen(
     uiState: ShopperUiState,
     onManualInputChanged: (String) -> Unit,
     onGenerateClicked: () -> Unit,
-    onBarcodeScanned: (rawValue: String, format: String) -> Unit,
+    onBarcodeScanned: (rawValue: String) -> Unit,
     onSaveClicked: () -> Unit,
     onShareClicked: () -> Unit,
     onSaveHistoryClicked: () -> Unit,
@@ -253,17 +307,20 @@ private fun ScanGenerateScreen(
         }
     }
 
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
+    ToolScreen(modifier = modifier) {
+        item {
+            SectionHeader(
+                icon = Icons.Outlined.QrCodeScanner,
+                title = "扫码",
+            )
+        }
+
         item {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(320.dp),
-                shape = RoundedCornerShape(8.dp),
+                shape = CardShape,
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 tonalElevation = 1.dp,
             ) {
@@ -275,14 +332,14 @@ private fun ScanGenerateScreen(
                                 torchAvailable = available
                                 if (!available) torchEnabled = false
                             },
-                            onBarcodeScanned = onBarcodeScanned,
+                            onBarcodeScanned = { rawValue, _ -> onBarcodeScanned(rawValue) },
                             modifier = Modifier.fillMaxSize(),
                         )
                         Surface(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(12.dp),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = CardShape,
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                         ) {
                             IconButton(
@@ -317,40 +374,6 @@ private fun ScanGenerateScreen(
                 onValueChanged = onManualInputChanged,
                 onGenerateClicked = onGenerateClicked,
             )
-        }
-
-        uiState.lastScanResult?.let { scanResult ->
-            item {
-                OutlinedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            AssistChip(
-                                onClick = {},
-                                label = { Text(scanResult.format) },
-                            )
-                            Text(
-                                text = "刚刚扫到",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Text(
-                            text = scanResult.rawValue,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-            }
         }
 
         item {
@@ -398,12 +421,6 @@ private fun CameraPermissionContent(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "也可以在下方手动输入条码内容生成 Code39。",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Spacer(Modifier.height(16.dp))
         Button(onClick = onGrantClicked) {
             Icon(Icons.Outlined.QrCodeScanner, contentDescription = null)
@@ -423,7 +440,7 @@ private fun ManualBarcodeInput(
 ) {
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = CardShape,
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
@@ -432,6 +449,10 @@ private fun ManualBarcodeInput(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            SectionHeader(
+                icon = Icons.Outlined.Keyboard,
+                title = "条码内容",
+            )
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChanged,
@@ -487,7 +508,7 @@ private fun BarcodeResultSection(
             text = error,
             modifier = modifier.fillMaxWidth(),
         )
-        else -> EmptyBarcodeState(modifier = modifier.fillMaxWidth())
+        else -> Unit
     }
 }
 
@@ -502,7 +523,7 @@ private fun BarcodePreviewCard(
 ) {
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = CardShape,
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
@@ -511,14 +532,20 @@ private fun BarcodePreviewCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            SectionHeader(
+                icon = Icons.Outlined.QrCodeScanner,
+                title = "生成结果",
+            )
             Text(
-                text = "Code39：$normalizedText",
+                text = normalizedText,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
+                shape = CardShape,
                 color = Color.White,
             ) {
                 Image(
@@ -526,7 +553,7 @@ private fun BarcodePreviewCard(
                     contentDescription = "Code39 条形码",
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(150.dp)
+                        .height(168.dp)
                         .background(Color.White)
                         .padding(12.dp),
                     contentScale = ContentScale.Fit,
@@ -576,34 +603,22 @@ private fun BarcodeHistorySection(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.History,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                text = "历史记录",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = "${history.size} 条",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        SectionHeader(
+            icon = Icons.Outlined.History,
+            title = "历史记录",
+            trailing = {
+                Text(
+                    text = "${history.size} 条",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+        )
 
         if (history.isEmpty()) {
-            Surface(
+            OutlinedCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = CardShape,
             ) {
                 Text(
                     text = "还没有保存的条码。",
@@ -633,7 +648,10 @@ private fun BarcodeHistoryRow(
 ) {
     OutlinedCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = CardShape,
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -673,34 +691,6 @@ private fun BarcodeHistoryRow(
     }
 }
 
-@Composable
-private fun EmptyBarcodeState(
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.QrCodeScanner,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-            Text(
-                text = "扫码或手动输入后，这里会显示可保存的 Code39 PNG。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ExpiryCheckScreen(
@@ -711,15 +701,11 @@ private fun ExpiryCheckScreen(
 ) {
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
 
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
+    ToolScreen(modifier = modifier) {
         item {
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
+                shape = CardShape,
                 colors = CardDefaults.elevatedCardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
@@ -728,10 +714,9 @@ private fun ExpiryCheckScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Text(
-                        text = "生产日期",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                    SectionHeader(
+                        icon = Icons.Outlined.Event,
+                        title = "保质期信息",
                     )
                     OutlinedButton(
                         onClick = { showDatePicker = true },
@@ -826,7 +811,7 @@ private fun ExpiryResultCard(
 
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
+        shape = CardShape,
         color = containerColor,
         contentColor = contentColor,
     ) {
@@ -860,10 +845,10 @@ private fun ExpiryResultCard(
                 }
             }
             HorizontalDivider(color = contentColor.copy(alpha = 0.24f))
-            Text("生产日期：${result.productionDate.format(ChineseDateFormatter)}")
-            Text("保质期：${result.shelfLifeDays} 天")
-            Text("到期日：${result.expiryDate.format(ChineseDateFormatter)}")
-            Text("今天：${result.today.format(ChineseDateFormatter)}")
+            ExpiryInfoRow("生产日期", result.productionDate.format(ChineseDateFormatter))
+            ExpiryInfoRow("保质期", "${result.shelfLifeDays} 天")
+            ExpiryInfoRow("到期日", result.expiryDate.format(ChineseDateFormatter))
+            ExpiryInfoRow("今天", result.today.format(ChineseDateFormatter))
             if (result.isProductionDateInFuture) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -882,13 +867,43 @@ private fun ExpiryResultCard(
 }
 
 @Composable
+private fun ExpiryInfoRow(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    val contentColor = LocalContentColor.current
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = contentColor.copy(alpha = 0.72f),
+        )
+        Spacer(Modifier.size(12.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
 private fun ErrorSurface(
     text: String,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
+        shape = CardShape,
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
     ) {

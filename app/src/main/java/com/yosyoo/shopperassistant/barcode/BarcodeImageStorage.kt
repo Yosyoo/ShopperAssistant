@@ -23,7 +23,7 @@ object BarcodeImageStorage {
             put(MediaStore.Images.Media.MIME_TYPE, "image/png")
             put(
                 MediaStore.Images.Media.RELATIVE_PATH,
-                "${Environment.DIRECTORY_PICTURES}/超市助手",
+                "${Environment.DIRECTORY_PICTURES}/ShopperAssistant",
             )
             put(MediaStore.Images.Media.IS_PENDING, 1)
         }

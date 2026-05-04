@@ -28,7 +28,7 @@ object ExpiryCalculator {
     ): ExpiryResult {
         require(shelfLifeDays > 0) { "保质期天数必须大于 0" }
 
-        val expiryDate = productionDate.plusDays(shelfLifeDays.toLong())
+        val expiryDate = productionDate.plusDays((shelfLifeDays - 1).toLong())
         val daysUntilExpiry = ChronoUnit.DAYS.between(today, expiryDate)
         val isExpired = !today.isBefore(expiryDate)
 
