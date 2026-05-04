@@ -9,7 +9,6 @@ import com.yosyoo.shopperassistant.barcode.InvalidCode39ContentException
 import com.yosyoo.shopperassistant.expiry.ExpiryCalculator
 import com.yosyoo.shopperassistant.expiry.ExpiryResult
 import com.yosyoo.shopperassistant.model.BarcodeHistoryItem
-import com.yosyoo.shopperassistant.model.ScanResult
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
@@ -26,7 +25,6 @@ enum class ShopperDestination {
 data class ShopperUiState(
     val selectedDestination: ShopperDestination = ShopperDestination.Scan,
     val manualBarcodeInput: String = "",
-    val lastScanResult: ScanResult? = null,
     val code39Bitmap: Bitmap? = null,
     val code39Error: String? = null,
     val normalizedCode39Text: String? = null,
@@ -59,30 +57,27 @@ class ShopperViewModel(application: Application) : AndroidViewModel(application)
             it.copy(
                 manualBarcodeInput = value,
                 code39Error = null,
+                code39Bitmap = null,
+                normalizedCode39Text = null,
             )
         }
     }
 
-    fun onBarcodeScanned(rawValue: String, format: String) {
+    fun onBarcodeScanned(rawValue: String) {
         val cleanValue = rawValue.trim()
         if (cleanValue.isEmpty()) return
-
-        val scanResult = ScanResult(
-            rawValue = cleanValue,
-            format = format,
-            scannedAt = Instant.now(),
-        )
-        generateCode39(
-            value = cleanValue,
-            scanResult = scanResult,
-        )
+        _uiState.update {
+            it.copy(
+                manualBarcodeInput = cleanValue,
+                code39Bitmap = null,
+                code39Error = null,
+                normalizedCode39Text = null,
+            )
+        }
     }
 
     fun generateCode39FromManualInput() {
-        generateCode39(
-            value = _uiState.value.manualBarcodeInput,
-            scanResult = null,
-        )
+        generateCode39(value = _uiState.value.manualBarcodeInput)
     }
 
     fun saveCurrentBarcodeToHistory(): Boolean {
@@ -91,7 +86,7 @@ class ShopperViewModel(application: Application) : AndroidViewModel(application)
         val historyItem = BarcodeHistoryItem(
             id = UUID.randomUUID().toString(),
             text = normalizedText,
-            format = current.lastScanResult?.format ?: "手动输入",
+            format = "条形码",
             savedAt = Instant.now(),
         )
         val nextHistory = listOf(historyItem)
@@ -104,10 +99,14 @@ class ShopperViewModel(application: Application) : AndroidViewModel(application)
 
     fun restoreBarcodeHistory(itemId: String) {
         val item = _uiState.value.barcodeHistory.firstOrNull { it.id == itemId } ?: return
-        generateCode39(
-            value = item.text,
-            scanResult = null,
-        )
+        _uiState.update {
+            it.copy(
+                manualBarcodeInput = item.text,
+                code39Bitmap = null,
+                code39Error = null,
+                normalizedCode39Text = null,
+            )
+        }
     }
 
     fun deleteBarcodeHistory(itemId: String): Boolean {
@@ -132,17 +131,13 @@ class ShopperViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun generateCode39(
-        value: String,
-        scanResult: ScanResult?,
-    ) {
+    private fun generateCode39(value: String) {
         try {
             val normalizedText = Code39Generator.normalizeOrThrow(value)
             val bitmap = Code39Generator.generate(normalizedText)
             _uiState.update { current ->
                 current.copy(
                     manualBarcodeInput = value,
-                    lastScanResult = scanResult ?: current.lastScanResult,
                     code39Bitmap = bitmap,
                     code39Error = null,
                     normalizedCode39Text = normalizedText,
@@ -152,7 +147,6 @@ class ShopperViewModel(application: Application) : AndroidViewModel(application)
             _uiState.update { current ->
                 current.copy(
                     manualBarcodeInput = value,
-                    lastScanResult = scanResult ?: current.lastScanResult,
                     code39Bitmap = null,
                     code39Error = exception.message ?: "该内容不能生成 Code39",
                     normalizedCode39Text = null,

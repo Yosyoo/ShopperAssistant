@@ -10,7 +10,7 @@ class ExpiryCalculatorTest {
     @Test
     fun check_marksExpiredWhenTodayEqualsExpiryDate() {
         val result = ExpiryCalculator.check(
-            productionDate = LocalDate.of(2026, 4, 26),
+            productionDate = LocalDate.of(2026, 4, 27),
             shelfLifeDays = 7,
             today = today,
         )
@@ -23,7 +23,7 @@ class ExpiryCalculatorTest {
     @Test
     fun check_marksExpiredWhenExpiryDateWasYesterday() {
         val result = ExpiryCalculator.check(
-            productionDate = LocalDate.of(2026, 4, 25),
+            productionDate = LocalDate.of(2026, 4, 26),
             shelfLifeDays = 7,
             today = today,
         )
@@ -35,13 +35,26 @@ class ExpiryCalculatorTest {
     @Test
     fun check_marksValidWhenExpiryDateIsTomorrow() {
         val result = ExpiryCalculator.check(
-            productionDate = LocalDate.of(2026, 4, 27),
+            productionDate = LocalDate.of(2026, 4, 28),
             shelfLifeDays = 7,
             today = today,
         )
 
         expectFalse(result.isExpired)
         expectEquals(1L, result.daysUntilExpiry)
+    }
+
+    @Test
+    fun check_countsProductionDateAsFirstShelfLifeDay() {
+        val result = ExpiryCalculator.check(
+            productionDate = LocalDate.of(2026, 5, 2),
+            shelfLifeDays = 3,
+            today = LocalDate.of(2026, 5, 4),
+        )
+
+        expectTrue(result.isExpired)
+        expectEquals(LocalDate.of(2026, 5, 4), result.expiryDate)
+        expectEquals(0L, result.daysUntilExpiry)
     }
 
     @Test
@@ -54,7 +67,7 @@ class ExpiryCalculatorTest {
 
         expectFalse(result.isExpired)
         expectTrue(result.isProductionDateInFuture)
-        expectEquals(LocalDate.of(2026, 5, 14), result.expiryDate)
+        expectEquals(LocalDate.of(2026, 5, 13), result.expiryDate)
     }
 
     @Test
