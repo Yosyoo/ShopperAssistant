@@ -1,6 +1,4 @@
-# ShopperAssistant / 超市助手
-
-一个给超市日常工作使用的离线 Android 原生工具。应用提供条码扫码生成和保质期检查两类功能，界面以简体中文为主，使用 Jetpack Compose 和 Material 3，支持系统深色/浅色模式。
+# ShopperAssistant
 
 ## 功能
 
